@@ -1,8 +1,9 @@
 <?php
 namespace Mjy191\LaravelWxPayV3;
 
-use App\Common\Enum;
-use App\Common\Tools;
+use Mjy191\Enum\Enum;
+use Mjy191\MyCurl\MyCurl;
+use Mjy191\Tools\Tools;
 use App\Exceptions\ApiException;
 
 class WxPayV3{
@@ -20,6 +21,7 @@ class WxPayV3{
     private $certPath;
     // 正式环境、测试环境
     private $env;
+    private $payNotifyUrl;
     const HOST = 'https://api.mch.weixin.qq.com';
 
     public function __construct(){
@@ -28,11 +30,12 @@ class WxPayV3{
         $this->sk = config('wx.sk');
         $this->skv3 = config('wx.skv3');
         $this->xlid = config('wx.xlid');
-        // 支付证书存放在app/Common/wxCert目录下
-        $this->certPath = app_path().'/Common/wxCert/';
+        $this->certPath = base_path().config('wx.certPath');
         $this->env = env('APP_ENV') == 'production';
+        $this->payNotifyUrl = config('wx.payNotifyUrl');
+        $this->refundsNotifyUrl = config('wx.refundsNotifyUrl');
     }
-
+    
     /**
      * 获取返回错误信息
      * @return mixed
@@ -52,7 +55,7 @@ class WxPayV3{
         $data['description'] = mb_strlen($param['description'])>127?mb_substr($param['description'],0,127):$param['description'];
         // 测试环境订单号前缀test
         $data['out_trade_no'] = $this->env?$param['out_trade_no']:"test{$param['out_trade_no']}";
-        $data['notify_url'] = Tools::getHost()."/api/wx/paynotify/payNum/".$param['out_trade_no'];
+        $data['notify_url'] = Tools::getHost().$this->payNotifyUrl.$param['out_trade_no'];
         $data['amount']['total'] = $param['amount'];
         $data['payer']['openid'] = $param['openid'];
 
@@ -98,7 +101,7 @@ class WxPayV3{
      * @return bool|mixed
      * @throws ApiException
      */
-    public function notify($callBack){
+    public function payNotify($callBack){
         $response = file_get_contents('php://input');
         $response = json_decode($response,true);
         if(!isset($response['resource']['ciphertext'])){
@@ -125,7 +128,7 @@ class WxPayV3{
     public function refunds($param){
         $data['out_trade_no'] = $this->env?$param['out_trade_no']:"test{$param['out_trade_no']}";
         $data['out_refund_no'] = $this->env?$param['out_trade_no']:"test{$param['out_trade_no']}";
-        $data['notify_url'] = Tools::getHost()."/api/wx/refundsnotify/payNum/".$param['out_trade_no'];
+        $data['notify_url'] = Tools::getHost().$this->refundsNotifyUrl.$param['out_trade_no'];
         //退款金额
         $data['amount']['refund'] = $param['refund'];
         //成交金额
@@ -221,7 +224,7 @@ class WxPayV3{
             'User-Agent:*/*',
             'Authorization: WECHATPAY2-SHA256-RSA2048 '.$token
         );
-        $res =  Tools::curl(self::HOST.$uri,$method,$data,$header);
+        $res =  MyCurl::send(self::HOST.$uri,$method,$data,$header);
         return $res;
     }
 
