@@ -3,6 +3,7 @@ namespace Mjy191\LaravelWxPayV3;
 
 use Mjy191\Enum\Enum;
 use Mjy191\MyCurl\MyCurl;
+use Mjy191\MyLogs\MyLogs;
 use Mjy191\Tools\Tools;
 use App\Exceptions\ApiException;
 
@@ -35,7 +36,7 @@ class WxPayV3{
         $this->payNotifyUrl = config('wx.payNotifyUrl');
         $this->refundsNotifyUrl = config('wx.refundsNotifyUrl');
     }
-    
+
     /**
      * 获取返回错误信息
      * @return mixed
@@ -109,7 +110,7 @@ class WxPayV3{
         }
         $de = $this->decryptToString($response['resource']['associated_data'],$response['resource']['nonce'],$response['resource']['ciphertext']);
         // 记录解密信息
-        Tools::log('notifyv3',$de);
+        MyLogs::write('notifyv3',$de);
         $de = json_decode($de,true);
         if(isset($de['trade_state']) && $de['trade_state']=='SUCCESS'){
             // 闭包执行业务逻辑
@@ -173,7 +174,7 @@ class WxPayV3{
             throw new ApiException('返回参数错误',2);
         }
         $de = $this->decryptToString($response['resource']['associated_data'],$response['resource']['nonce'],$response['resource']['ciphertext']);
-        Tools::log('notifyv3',$de);
+        MyLogs::write('notifyv3',$de);
         $de = json_decode($de,true);
         if(isset($de['refund_status']) && $de['refund_status']=='SUCCESS'){
             call_user_func_array($callBack,[$de]);
