@@ -1,4 +1,5 @@
 <?php
+
 namespace Mjy191\LaravelWxPayV3;
 
 use Mjy191\Enum\Enum;
@@ -7,8 +8,8 @@ use Mjy191\MyLogs\MyLogs;
 use Mjy191\Tools\Tools;
 use App\Exceptions\ApiException;
 
-class WxPayV3{
-
+class WxPayV3
+{
     private $appid;
     private $mchid;
     private $sk;
@@ -25,13 +26,14 @@ class WxPayV3{
     private $payNotifyUrl;
     const HOST = 'https://api.mch.weixin.qq.com';
 
-    public function __construct(){
+    public function __construct()
+    {
         $this->appid = config('wx.appAPPID');
         $this->mchid = config('wx.payMCHID');
         $this->sk = config('wx.sk');
         $this->skv3 = config('wx.skv3');
         $this->xlid = config('wx.xlid');
-        $this->certPath = base_path().config('wx.certPath');
+        $this->certPath = base_path() . config('wx.certPath');
         $this->env = env('APP_ENV') == 'production';
         $this->payNotifyUrl = config('wx.payNotifyUrl');
         $this->refundsNotifyUrl = config('wx.refundsNotifyUrl');
@@ -41,7 +43,8 @@ class WxPayV3{
      * 获取返回错误信息
      * @return mixed
      */
-    public function getError(){
+    public function getError()
+    {
         return $this->error;
     }
 
@@ -50,32 +53,33 @@ class WxPayV3{
      * @param $param
      * @return array|bool
      */
-    public function jsApi($param){
-        $data['appid'] =$this->appid;
-        $data['mchid'] =$this->mchid;
-        $data['description'] = mb_strlen($param['description'])>127?mb_substr($param['description'],0,127):$param['description'];
+    public function jsApi($param)
+    {
+        $data['appid'] = $this->appid;
+        $data['mchid'] = $this->mchid;
+        $data['description'] = mb_strlen($param['description']) > 127 ? mb_substr($param['description'], 0, 127) : $param['description'];
         // 测试环境订单号前缀test
-        $data['out_trade_no'] = $this->env?$param['out_trade_no']:"test{$param['out_trade_no']}";
-        $data['notify_url'] = Tools::getHost().$this->payNotifyUrl.$param['out_trade_no'];
+        $data['out_trade_no'] = $this->env ? $param['out_trade_no'] : "test{$param['out_trade_no']}";
+        $data['notify_url'] = Tools::getHost() . $this->payNotifyUrl . $param['out_trade_no'];
         $data['amount']['total'] = $param['amount'];
         $data['payer']['openid'] = $param['openid'];
 
         //{"prepay_id":"wx1111111111111"}
-        $res = $this->request('/v3/pay/transactions/jsapi','post',$data);
-        $res = json_decode($res,true);
-        if(isset($res['prepay_id'])){
+        $res = $this->request('/v3/pay/transactions/jsapi', 'post', $data);
+        $res = json_decode($res, true);
+        if (isset($res['prepay_id'])) {
             $appData = [
-                'appId'=>$this->appid,
-                'timeStamp'=>(string)$this->time,
-                'nonceStr'=>$this->noncestr,
-                'package'=>"prepay_id={$res['prepay_id']}",
-                'signType'=>"RSA",
+                'appId' => $this->appid,
+                'timeStamp' => (string)$this->time,
+                'nonceStr' => $this->noncestr,
+                'package' => "prepay_id={$res['prepay_id']}",
+                'signType' => "RSA",
             ];
             $appData['paySign'] = $this->getJsApiSign($appData);
             return $appData;
-        }else{
+        } else {
             $this->error = $res;
-            throw new ApiException('支付下单系统错误',Enum::erCodeSystem);
+            throw new ApiException('支付下单系统错误', Enum::erCodeSystem);
         }
     }
 
@@ -84,15 +88,16 @@ class WxPayV3{
      * @param $out_trade_no
      * @return bool|mixed
      */
-    public function orderDetal($out_trade_no){
+    public function orderDetal($out_trade_no)
+    {
         $uri = "/v3/pay/transactions/out-trade-no/{$out_trade_no}?mchid={$this->mchid}";
         $res = $this->request($uri);
-        $res = json_decode($res,true);
-        if(isset($res['trade_state']) && $res['trade_state']=='SUCCESS'){
-            return  $res;
-        }else{
+        $res = json_decode($res, true);
+        if (isset($res['trade_state']) && $res['trade_state'] == 'SUCCESS') {
+            return $res;
+        } else {
             $this->error = $res;
-            throw new ApiException('查询支付订单系统错误',Enum::erCodeSystem);
+            throw new ApiException('查询支付订单系统错误', Enum::erCodeSystem);
         }
     }
 
@@ -102,22 +107,23 @@ class WxPayV3{
      * @return bool|mixed
      * @throws ApiException
      */
-    public function payNotify($callBack){
+    public function payNotify($callBack)
+    {
         $response = file_get_contents('php://input');
-        $response = json_decode($response,true);
-        if(!isset($response['resource']['ciphertext'])){
-            throw new ApiException('支付回调返回参数错误',2);
+        $response = json_decode($response, true);
+        if (!isset($response['resource']['ciphertext'])) {
+            throw new ApiException('支付回调返回参数错误', 2);
         }
-        $de = $this->decryptToString($response['resource']['associated_data'],$response['resource']['nonce'],$response['resource']['ciphertext']);
+        $de = $this->decryptToString($response['resource']['associated_data'], $response['resource']['nonce'], $response['resource']['ciphertext']);
         // 记录解密信息
-        MyLogs::write('notifyv3',$de);
-        $de = json_decode($de,true);
-        if(isset($de['trade_state']) && $de['trade_state']=='SUCCESS'){
+        MyLogs::write('notifyv3', $de);
+        $de = json_decode($de, true);
+        if (isset($de['trade_state']) && $de['trade_state'] == 'SUCCESS') {
             // 闭包执行业务逻辑
-            call_user_func_array($callBack,[$de]);
-            return ['code'=>'SUCCESS','message'=>'成功'];
-        }else{
-            return['code'=>'FAIL','message'=>'支付结果回调处理错误'];
+            call_user_func_array($callBack, [$de]);
+            return ['code' => 'SUCCESS', 'message' => '成功'];
+        } else {
+            return ['code' => 'FAIL', 'message' => '支付结果回调处理错误'];
         }
     }
 
@@ -126,23 +132,24 @@ class WxPayV3{
      * @param $param
      * @return bool|mixed
      */
-    public function refunds($param){
-        $data['out_trade_no'] = $this->env?$param['out_trade_no']:"test{$param['out_trade_no']}";
-        $data['out_refund_no'] = $this->env?$param['out_trade_no']:"test{$param['out_trade_no']}";
-        $data['notify_url'] = Tools::getHost().$this->refundsNotifyUrl.$param['out_trade_no'];
+    public function refunds($param)
+    {
+        $data['out_trade_no'] = $this->env ? $param['out_trade_no'] : "test{$param['out_trade_no']}";
+        $data['out_refund_no'] = $this->env ? $param['out_trade_no'] : "test{$param['out_trade_no']}";
+        $data['notify_url'] = Tools::getHost() . $this->refundsNotifyUrl . $param['out_trade_no'];
         //退款金额
         $data['amount']['refund'] = $param['refund'];
         //成交金额
         $data['amount']['total'] = $param['total'];
         $data['amount']['currency'] = 'CNY';
-        $res = $this->request("/v3/refund/domestic/refunds",'post',$data);
+        $res = $this->request("/v3/refund/domestic/refunds", 'post', $data);
         //$res ='{"amount":{"currency":"CNY","discount_refund":0,"from":[],"payer_refund":1,"payer_total":1,"refund":1,"settlement_refund":1,"settlement_total":1,"total":1},"channel":"ORIGINAL","create_time":"2021-07-19T22:35:45+08:00","funds_account":"AVAILABLE","out_refund_no":"dev_75","out_trade_no":"dev_75","promotion_detail":[],"refund_id":"50301208752021071910775603275","status":"PROCESSING","transaction_id":"4200001210202107188024304115","user_received_account":"工商银行借记卡"}';
-        $res = json_decode($res,true);
-        if(isset($res['status']) && in_array($res['status'],['PROCESSING','SUCCESS'])){
+        $res = json_decode($res, true);
+        if (isset($res['status']) && in_array($res['status'], ['PROCESSING', 'SUCCESS'])) {
             return $res;
-        }else{
+        } else {
             $this->error = $res;
-            throw new ApiException('退款处理失败',Enum::erCodeSystem);
+            throw new ApiException('退款处理失败', Enum::erCodeSystem);
         }
     }
 
@@ -152,113 +159,147 @@ class WxPayV3{
      * @param $param
      * @throws Exception
      */
-    public function refundsResult($param){
+    public function refundsResult($param)
+    {
         $url = "/v3/refund/domestic/refunds/{$param['out_refund_no']}";
         $res = $this->request($url);
-        $res = json_decode($res,true);
-        if(isset($res['status']) && $res['status']=='SUCCESS'){
+        $res = json_decode($res, true);
+        if (isset($res['status']) && $res['status'] == 'SUCCESS') {
             return $res;
-        }else{
+        } else {
             $this->error = $res;
-            throw new ApiException('退款接口查询错误',Enum::erCodeSystem);
+            throw new ApiException('退款接口查询错误', Enum::erCodeSystem);
         }
     }
 
     /**
      * v3 退款结果异步通知
      */
-    public function refundsNotify($callBack){
+    public function refundsNotify($callBack)
+    {
         $response = file_get_contents('php://input');
-        $response = json_decode($response,true);
-        if(!isset($response['resource']['ciphertext'])){
-            throw new ApiException('返回参数错误',2);
+        $response = json_decode($response, true);
+        if (!isset($response['resource']['ciphertext'])) {
+            throw new ApiException('返回参数错误', 2);
         }
-        $de = $this->decryptToString($response['resource']['associated_data'],$response['resource']['nonce'],$response['resource']['ciphertext']);
-        MyLogs::write('notifyv3',$de);
-        $de = json_decode($de,true);
-        if(isset($de['refund_status']) && $de['refund_status']=='SUCCESS'){
-            call_user_func_array($callBack,[$de]);
-            return ['code'=>'SUCCESS','message'=>'成功'];
-        }else{
-            return ['code'=>'FAIL','message'=>'退款结果回调处理错误'];
+        $de = $this->decryptToString($response['resource']['associated_data'], $response['resource']['nonce'], $response['resource']['ciphertext']);
+        MyLogs::write('notifyv3', $de);
+        $de = json_decode($de, true);
+        if (isset($de['refund_status']) && $de['refund_status'] == 'SUCCESS') {
+            call_user_func_array($callBack, [$de]);
+            return ['code' => 'SUCCESS', 'message' => '成功'];
+        } else {
+            return ['code' => 'FAIL', 'message' => '退款结果回调处理错误'];
         }
     }
 
     /**
      * 提现到零钱
      */
-    public function withDraw($param){
+    public function withDraw($param)
+    {
         $data['appid'] = $this->appid;
-        $data['out_batch_no'] = $this->env?$param['out_batch_no']:"test{$param['out_batch_no']}";
+        $data['out_batch_no'] = $this->env ? $param['out_batch_no'] : "test{$param['out_batch_no']}";
         $data['batch_name'] = $param['batch_name'];
         $data['batch_remark'] = $param['batch_remark'];
-        $data['total_amount'] = 100*$param['amount'];
+        $data['total_amount'] = 100 * $param['amount'];
         $data['total_num'] = 1;
         $data['transfer_detail_list'][0] = [
-            'out_detail_no'=>'',
-            'transfer_amount'=>100*$param['amount'],
-            'transfer_remark'=>$param['transfer_remark'],
-            'openid'=>$param['openid'],
+            'out_detail_no' => '',
+            'transfer_amount' => 100 * $param['amount'],
+            'transfer_remark' => $param['transfer_remark'],
+            'openid' => $param['openid'],
         ];
 
-        $res = $this->request("/v3/transfer/batches",'post',$data);
-        $res = json_decode($res,true);
-        if(isset($res['out_batch_no'])){
+        $res = $this->request("/v3/transfer/batches", 'post', $data);
+        $res = json_decode($res, true);
+        if (isset($res['out_batch_no'])) {
             return $res;
-        }else{
+        } else {
             $this->error = $res;
-            throw new ApiException('提现到零钱失败',Enum::erCodeSystem);
+            throw new ApiException('提现到零钱失败', Enum::erCodeSystem);
         }
     }
 
-    private function request($uri, $method='get', $data=''){
+    /**
+     * 发起http请求
+     * @param $uri
+     * @param string $method
+     * @param string $data
+     * @return bool|string
+     * @throws ApiException
+     */
+    private function request($uri, $method = 'get', $data = '')
+    {
         $this->time = time();
         $this->noncestr = $this->getNoncestr();
-        if($data){
+        if ($data) {
             $data = json_encode($data);
         }
-        $sign = $this->sign($uri,$data,$method,$this->noncestr,$this->time);//签名
-        $token = sprintf('mchid="%s",serial_no="%s",nonce_str="%s",timestamp="%d",signature="%s"',$this->mchid,$this->xlid,$this->noncestr,$this->time,$sign);//头部信息
-        $header  = array(
-            'Content-Type:'.'application/json; charset=UTF-8',
+        $sign = $this->sign($uri, $data, $method, $this->noncestr, $this->time);//签名
+        $token = sprintf('mchid="%s",serial_no="%s",nonce_str="%s",timestamp="%d",signature="%s"', $this->mchid, $this->xlid, $this->noncestr, $this->time, $sign);//头部信息
+        $header = array(
+            'Content-Type:' . 'application/json; charset=UTF-8',
             'Accept:application/json',
             'User-Agent:*/*',
-            'Authorization: WECHATPAY2-SHA256-RSA2048 '.$token
+            'Authorization: WECHATPAY2-SHA256-RSA2048 ' . $token
         );
-        $res =  MyCurl::send(self::HOST.$uri,$method,$data,$header);
+        $res = MyCurl::send(self::HOST . $uri, $method, $data, $header);
         return $res;
     }
 
-    //微信支付签名
-    private function sign($url, $data, $method, $randstr, $time){
-        if($method=='post'){
-            $str = "POST"."\n".$url."\n".$time."\n".$randstr."\n".$data."\n";
-        }else{
-            $str = "GET"."\n".$url."\n".$time."\n".$randstr."\n"."\n";
+    /**
+     * 微信支付签名
+     * @param $url
+     * @param $data
+     * @param $method
+     * @param $randstr
+     * @param $time
+     * @return string
+     * @throws ApiException
+     */
+    private function sign($url, $data, $method, $randstr, $time)
+    {
+        if ($method == 'post') {
+            $str = "POST" . "\n" . $url . "\n" . $time . "\n" . $randstr . "\n" . $data . "\n";
+        } else {
+            $str = "GET" . "\n" . $url . "\n" . $time . "\n" . $randstr . "\n" . "\n";
         }
         $key = $this->getPem();//在商户平台下载的秘钥
-        $str = $this->getSha256WithRSA($str,$key);
+        $str = $this->getSha256WithRSA($str, $key);
         return $str;
     }
 
-    // 获取证书
-    private function getPem(){
-        $key = file_get_contents($this->certPath.'apiclient_key.pem');//在商户平台下载的秘钥
-        if(!$key){
-            throw new ApiException('get pem error',Enum::erCodeSystem);
+    /**
+     * 读取微信支付证书（证书从微信平台下载）
+     * @return false|string
+     * @throws ApiException
+     */
+    private function getPem()
+    {
+        $key = file_get_contents($this->certPath . 'apiclient_key.pem');//在商户平台下载的秘钥
+        if (!$key) {
+            throw new ApiException('get pem error', Enum::erCodeSystem);
         }
         return $key;
     }
 
-    //调起支付的签名
-    private function getJsApiSign($data){
-        $str = $data['appId']."\n".$data['timeStamp']."\n".$data['nonceStr']."\n".$data['package']."\n";
+    /**
+     * 调起支付的签名
+     * @param $data
+     * @return string
+     * @throws ApiException
+     */
+    private function getJsApiSign($data)
+    {
+        $str = $data['appId'] . "\n" . $data['timeStamp'] . "\n" . $data['nonceStr'] . "\n" . $data['package'] . "\n";
         $key = $this->getPem();
-        $str = $this->getSha256WithRSA($str,$key);
+        $str = $this->getSha256WithRSA($str, $key);
         return $str;
     }
 
-    private function getSha256WithRSA($content, $privateKey){
+    private function getSha256WithRSA($content, $privateKey)
+    {
         $raw_sign = "";
         openssl_sign($content, $raw_sign, $privateKey, "sha256WithRSAEncryption");
         $sign = base64_encode($raw_sign);
@@ -266,7 +307,7 @@ class WxPayV3{
     }
 
     /**
-     * 获取随机数
+     * 生成随机数
      */
     private function getNoncestr($length = 32)
     {
@@ -281,9 +322,9 @@ class WxPayV3{
     /**
      * Decrypt AEAD_AES_256_GCM ciphertext
      *
-     * @param string    $associatedData     AES GCM additional authentication data
-     * @param string    $nonceStr           AES GCM nonce
-     * @param string    $ciphertext         AES GCM cipher text
+     * @param string $associatedData AES GCM additional authentication data
+     * @param string $nonceStr AES GCM nonce
+     * @param string $ciphertext AES GCM cipher text
      *
      * @return string|bool      Decrypted string on success or FALSE on failure
      */
