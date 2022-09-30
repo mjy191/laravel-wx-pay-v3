@@ -2,7 +2,10 @@
 ### 1.1 项目介绍
 > 基于laravel框架 微信小程序支付v3版本，支付请求、支付回调、退款请求、退款回调
 ### 1.2 配置
-在laravel的配置目录新建 config/wx.php
+在laravel的配置config/app.php中的provide添加```Mjy191\LaravelWxPayV3\ServiceProvider::class``
+
+运行命令```php artisan vendor:publish --provider="Mjy191\LaravelWxPayV3\ServiceProvider"```发布配置config/wx.php
+
 配置微信小程序的支付
 ```
 return [
