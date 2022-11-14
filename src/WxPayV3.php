@@ -2,6 +2,7 @@
 
 namespace Mjy191\LaravelWxPayV3;
 
+use Illuminate\Support\Facades\Request;
 use Mjy191\Enum\Enum;
 use Mjy191\MyCurl\MyCurl;
 use Mjy191\MyLogs\MyLogs;
@@ -109,7 +110,7 @@ class WxPayV3
      */
     public function payNotify($callBack)
     {
-        $response = file_get_contents('php://input');
+        $response = Request::instance()->getContent();
         $response = json_decode($response, true);
         if (!isset($response['resource']['ciphertext'])) {
             throw new ApiException('支付回调返回参数错误', 2);
@@ -177,7 +178,7 @@ class WxPayV3
      */
     public function refundsNotify($callBack)
     {
-        $response = file_get_contents('php://input');
+        $response = Request::instance()->getContent();
         $response = json_decode($response, true);
         if (!isset($response['resource']['ciphertext'])) {
             throw new ApiException('返回参数错误', 2);
