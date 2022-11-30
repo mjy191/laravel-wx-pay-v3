@@ -135,8 +135,10 @@ class WxPayV3
      */
     public function refunds($param)
     {
+        //原订单号
         $data['out_trade_no'] = $this->env ? $param['out_trade_no'] : "test{$param['out_trade_no']}";
-        $data['out_refund_no'] = $this->env ? $param['out_trade_no'] : "test{$param['out_trade_no']}";
+        //退款订单号
+        $data['out_refund_no'] = $this->env ? $param['out_refund_no'] : "test{$param['out_refund_no']}";
         $data['notify_url'] = Tools::getHost() . $this->refundsNotifyUrl . $param['out_trade_no'];
         //退款金额
         $data['amount']['refund'] = $param['refund'];
