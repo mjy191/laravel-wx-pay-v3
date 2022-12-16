@@ -121,8 +121,11 @@ class WxPayV3
         $de = json_decode($de, true);
         if (isset($de['trade_state']) && $de['trade_state'] == 'SUCCESS') {
             // 闭包执行业务逻辑
-            call_user_func_array($callBack, [$de]);
-            return ['code' => 'SUCCESS', 'message' => '成功'];
+            if(call_user_func_array($callBack, [$de])===true){
+                return ['code' => 'SUCCESS', 'message' => '成功'];
+            }else{
+                return ['code' => 'FAIL', 'message' => '支付结果回调处理错误'];
+            }
         } else {
             return ['code' => 'FAIL', 'message' => '支付结果回调处理错误'];
         }
@@ -189,8 +192,11 @@ class WxPayV3
         MyLogs::write('notifyv3', $de);
         $de = json_decode($de, true);
         if (isset($de['refund_status']) && $de['refund_status'] == 'SUCCESS') {
-            call_user_func_array($callBack, [$de]);
-            return ['code' => 'SUCCESS', 'message' => '成功'];
+            if(call_user_func_array($callBack, [$de])===true){
+                return ['code' => 'SUCCESS', 'message' => '成功'];
+            }else{
+                return ['code' => 'FAIL', 'message' => '退款结果回调处理错误'];
+            }
         } else {
             return ['code' => 'FAIL', 'message' => '退款结果回调处理错误'];
         }
@@ -205,11 +211,11 @@ class WxPayV3
         $data['out_batch_no'] = $this->env ? $param['out_batch_no'] : "test{$param['out_batch_no']}";
         $data['batch_name'] = $param['batch_name'];
         $data['batch_remark'] = $param['batch_remark'];
-        $data['total_amount'] = 100 * $param['amount'];
+        $data['total_amount'] = round(100 * $param['amount']);
         $data['total_num'] = 1;
         $data['transfer_detail_list'][0] = [
             'out_detail_no' => '',
-            'transfer_amount' => 100 * $param['amount'],
+            'transfer_amount' => round(100 * $param['amount']),
             'transfer_remark' => $param['transfer_remark'],
             'openid' => $param['openid'],
         ];
