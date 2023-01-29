@@ -26,6 +26,8 @@ class WxPayV3
     private $env;
     private $payNotifyUrl;
     const HOST = 'https://api.mch.weixin.qq.com';
+    const GET = 'GET';
+    const POST = 'POST';
 
     public function __construct()
     {
@@ -66,7 +68,7 @@ class WxPayV3
         $data['payer']['openid'] = $param['openid'];
 
         //{"prepay_id":"wx1111111111111"}
-        $res = $this->request('/v3/pay/transactions/jsapi', 'post', $data);
+        $res = $this->request('/v3/pay/transactions/jsapi', self::POST, $data);
         $res = json_decode($res, true);
         if (isset($res['prepay_id'])) {
             $appData = [
@@ -148,7 +150,7 @@ class WxPayV3
         //成交金额
         $data['amount']['total'] = $param['total'];
         $data['amount']['currency'] = 'CNY';
-        $res = $this->request("/v3/refund/domestic/refunds", 'post', $data);
+        $res = $this->request("/v3/refund/domestic/refunds", self::POST, $data);
         //$res ='{"amount":{"currency":"CNY","discount_refund":0,"from":[],"payer_refund":1,"payer_total":1,"refund":1,"settlement_refund":1,"settlement_total":1,"total":1},"channel":"ORIGINAL","create_time":"2021-07-19T22:35:45+08:00","funds_account":"AVAILABLE","out_refund_no":"dev_75","out_trade_no":"dev_75","promotion_detail":[],"refund_id":"50301208752021071910775603275","status":"PROCESSING","transaction_id":"4200001210202107188024304115","user_received_account":"工商银行借记卡"}';
         $res = json_decode($res, true);
         if (isset($res['status']) && in_array($res['status'], ['PROCESSING', 'SUCCESS'])) {
@@ -220,7 +222,7 @@ class WxPayV3
             'openid' => $param['openid'],
         ];
 
-        $res = $this->request("/v3/transfer/batches", 'post', $data);
+        $res = $this->request("/v3/transfer/batches", self::POST, $data);
         $res = json_decode($res, true);
         if (isset($res['out_batch_no'])) {
             return $res;
@@ -238,7 +240,7 @@ class WxPayV3
      * @return bool|string
      * @throws ApiException
      */
-    private function request($uri, $method = 'get', $data = '')
+    private function request($uri, $method = self::GET, $data = '')
     {
         $this->time = time();
         $this->noncestr = $this->getNoncestr();
@@ -269,10 +271,12 @@ class WxPayV3
      */
     private function sign($url, $data, $method, $randstr, $time)
     {
-        if ($method == 'post') {
-            $str = "POST" . "\n" . $url . "\n" . $time . "\n" . $randstr . "\n" . $data . "\n";
+        if ($method == self::POST) {
+            $str = self::POST . "\n" . $url . "\n" . $time . "\n" . $randstr . "\n" . $data . "\n";
+        } else if($method == self::GET){
+            $str = self::GET . "\n" . $url . "\n" . $time . "\n" . $randstr . "\n" . "\n";
         } else {
-            $str = "GET" . "\n" . $url . "\n" . $time . "\n" . $randstr . "\n" . "\n";
+            throw new ApiException("无此请求方式",Enum::erCodeServer);
         }
         $key = $this->getPem();//在商户平台下载的秘钥
         $str = $this->getSha256WithRSA($str, $key);
