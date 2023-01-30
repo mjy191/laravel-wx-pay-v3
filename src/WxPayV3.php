@@ -210,16 +210,16 @@ class WxPayV3
     public function withDraw($param)
     {
         $data['appid'] = $this->appid;
-        $data['out_batch_no'] = $this->env ? $param['out_batch_no'] : "test{$param['out_batch_no']}";
-        $data['batch_name'] = $param['batch_name'];
-        $data['batch_remark'] = $param['batch_remark'];
-        $data['total_amount'] = round(100 * $param['amount']);
+        $data['out_batch_no'] = env('APP_ENV')=='production'?$param['out_batch_no']:"test{$param['out_batch_no']}";
+        $data['batch_name'] = mb_substr($param['batch_name'],0,32);
+        $data['batch_remark'] = mb_substr($param['batch_remark'],0,32);
+        $data['total_amount'] = (int)round(100*$param['amount']);
         $data['total_num'] = 1;
         $data['transfer_detail_list'][0] = [
-            'out_detail_no' => '',
-            'transfer_amount' => round(100 * $param['amount']),
-            'transfer_remark' => $param['transfer_remark'],
-            'openid' => $param['openid'],
+            'out_detail_no'=>$data['out_batch_no'],
+            'transfer_amount'=>(int)round(100*$param['amount']),
+            'transfer_remark'=>mb_substr($param['transfer_remark'],0,32),
+            'openid'=>$param['openid'],
         ];
 
         $res = $this->request("/v3/transfer/batches", self::POST, $data);
