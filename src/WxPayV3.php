@@ -91,8 +91,9 @@ class WxPayV3
      * @param $out_trade_no
      * @return bool|mixed
      */
-    public function orderDetal($out_trade_no)
+    public function orderDetail($out_trade_no)
     {
+        $out_trade_no = env('APP_ENV')=='production'?$out_trade_no:"test{$out_trade_no}";
         $uri = "/v3/pay/transactions/out-trade-no/{$out_trade_no}?mchid={$this->mchid}";
         $res = $this->request($uri);
         $res = json_decode($res, true);
